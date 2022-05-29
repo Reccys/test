@@ -262,13 +262,14 @@ end
 
 --[ SCRIPT ]--
 cmd.add({"script", "ls", "s", "run"}, {"script <source>", "Publicly displays the name and version of the admin"}, function(source)
-
+while true do
 local args = {
     [1] = "[Rexys FE Admin Hub v0.0.1]",
     [2] = "All"
 }
 
 game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(unpack(args))
+wait(99999999999999999999999999)
 end)
 
 cmd.add({"httpget", "hl", "get"}, {"httpget <url>", "Run the contents of a given URL"}, function(url)
