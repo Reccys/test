@@ -1473,6 +1473,17 @@ cmd.add({"clip", "unnoclip"}, {"clip", "Enable your player's collision"}, functi
 	lib.disconnect("noclip")
 end)
 
+cmd.add({"killchat", "breakchat"}, {"killchat", "Slowly breaks the chat"}, function()
+while true do
+    wait(1.7)
+local args = {
+    [1] = " ",
+    [2] = "All"
+}
+game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(unpack(args))
+end
+end)
+
 cmd.add({"Reanimate", "reanim"}, {"reanimate", "Reanimates your player"}, function()
 	loadstring(game:HttpGet('https://raw.githubusercontent.com/Tescalus/Pendulum-Hubs-Source/main/ReanimMain.lua'))()
 end)
