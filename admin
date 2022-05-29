@@ -1,4 +1,4 @@
-
+-- this is old code broother
 
 local opt = {
 	prefix = '>',			-- ;ff me | /ff me
@@ -1143,7 +1143,7 @@ cmd.add({"noclip", "nclip", "nc"}, {"noclip", "Disable your player's collision"}
 		end
 	end))
 end)
-cmd.add({"clip", "c"}, {"clip", "Enable your player's collision"}, function()
+cmd.add({"clip", "unnoclip"}, {"clip", "Enable your player's collision"}, function()
 	lib.disconnect("noclip")
 end)
 
