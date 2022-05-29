@@ -1292,7 +1292,7 @@ cmd.add({"hatorbit"}, {"hatorbit [height] [distance]", "Make your hats orbit aro
 	end
 end)
 
-cmd.add({"seizure"}, {"seizure [height] [distance]", "Make your limbs bounce around your head"}, function(h, d)
+cmd.add({"limbbounce"}, {"limbbounce [height] [distance]", "Make your limbs bounce around your head"}, function(h, d)
 	local head = character:FindFirstChild("Head")
 	if not head then return end
 	local i = 2
