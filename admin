@@ -1141,6 +1141,7 @@ cmd.add({"noclip", "nclip", "nc"}, {"noclip", "Disable your player's collision"}
 		end
 	end))
 end)
+
 cmd.add({"clip", "unnoclip"}, {"clip", "Enable your player's collision"}, function()
 	lib.disconnect("noclip")
 end)
@@ -1291,7 +1292,7 @@ cmd.add({"hatorbit"}, {"hatorbit [height] [distance]", "Make your hats orbit aro
 	end
 end)
 
-cmd.add({"limbbounce"}, {"limbbounce [height] [distance]", "Make your limbs bounce around your head"}, function(h, d)
+cmd.add({"seizure"}, {"seizure [height] [distance]", "Make your limbs bounce around your head"}, function(h, d)
 	local head = character:FindFirstChild("Head")
 	if not head then return end
 	local i = 2
