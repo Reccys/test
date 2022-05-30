@@ -30,6 +30,90 @@ localPlayer.CharacterAdded:Connect(function(c)
 end)
 
 --[[ COMMAND FUNCTIONS ]]--
+
+function execCmd(cmdStr,speaker,store)
+	cmdStr = cmdStr:gsub("%s+$","")
+	task.spawn(function()
+		local rawCmdStr = cmdStr
+		cmdStr = string.gsub(cmdStr,"\\\\","%%BackSlash%%")
+		local commandsToRun = splitString(cmdStr,"\\")
+		for i,v in pairs(commandsToRun) do
+			v = string.gsub(v,"%%BackSlash%%","\\")
+			local x,y,num = v:find("^(%d+)%^")
+			local cmdDelay = 0
+			local infTimes = false
+			if num then
+				v = v:sub(y+1)
+				local x,y,del = v:find("^([%d%.]+)%^")
+				if del then
+					v = v:sub(y+1)
+					cmdDelay = tonumber(del) or 0
+				end
+			else
+				local x,y = v:find("^inf%^")
+				if x then
+					infTimes = true
+					v = v:sub(y+1)
+					local x,y,del = v:find("^([%d%.]+)%^")
+					if del then
+						v = v:sub(y+1)
+						del = tonumber(del) or 1
+						cmdDelay = (del > 0 and del or 1)
+					else
+						cmdDelay = 1
+					end
+				end
+			end
+			num = tonumber(num or 1)
+
+			if v:sub(1,1) == "!" then
+				local chunks = splitString(v:sub(2),split)
+				if chunks[1] and lastCmds[chunks[1]] then v = lastCmds[chunks[1]] end
+			end
+
+			local args = splitString(v,split)
+			local cmdName = args[1]
+			local cmd = findCmd(cmdName)
+			if cmd then
+				table.remove(args,1)
+				cargs = args
+				if not speaker then speaker = Players.LocalPlayer end
+				if store then
+					if speaker == Players.LocalPlayer then
+						if cmdHistory[1] ~= rawCmdStr and rawCmdStr:sub(1,11) ~= 'lastcommand' and rawCmdStr:sub(1,7) ~= 'lastcmd' then
+							table.insert(cmdHistory,1,rawCmdStr)
+						end
+					end
+					if #cmdHistory > 30 then table.remove(cmdHistory) end
+
+					lastCmds[cmdName] = v
+				end
+				local cmdStartTime = tick()
+				if infTimes then
+					while lastBreakTime < cmdStartTime do
+						local success,err = pcall(cmd.FUNC,args, speaker)
+						if not success and _G.IY_DEBUG then
+							warn("Command Error:", cmdName, err)
+						end
+						wait(cmdDelay)
+					end
+				else
+					for rep = 1,num do
+						if lastBreakTime > cmdStartTime then break end
+						local success,err = pcall(function()
+							cmd.FUNC(args, speaker)
+						end)
+						if not success and _G.IY_DEBUG then
+							warn("Command Error:", cmdName, err)
+						end
+						if cmdDelay ~= 0 then wait(cmdDelay) end
+					end
+				end
+			end
+		end
+	end)
+end	
+
 cmd = {}
 cmd.add = function(...)
 	local vars = {...}
@@ -1207,7 +1291,11 @@ cmd.add({"sit"}, {"sit", "Sit your player"}, function()
 	end
 end)
 
-cmd.add({"antikill", "nofekill", "antifekill"}, {"antikill", "Toggle FE kill prevention  -Cyrus"}, function()
+cmd.add({"killclient", "destroyclient"}, {"killclient", "Kills the roblox client"}, function()
+	game:shutdown() 
+end)
+
+cmd.add({"antikill", "nofekill", "antifekill"}, {"antikill", "Toggle FE kill prevention"}, function()
 	-- from cyrus
 	if connections["antifekill"] then lib.disconnect("antifekill") return end
 	local LP = game:GetService'Players'.LocalPlayer
@@ -1244,6 +1332,27 @@ cmd.add({"antikill", "nofekill", "antifekill"}, {"antikill", "Toggle FE kill pre
 	end))
 end)
 
+cmd.add({"godmode", "god"}, {"god", "maybe godmode"}, function(p)
+    	local Cam = workspace.CurrentCamera
+	local Pos, Char = Cam.CFrame, speaker.Character
+	local Human = Char and Char.FindFirstChildWhichIsA(Char, "Humanoid")
+	local nHuman = Human.Clone(Human)
+	nHuman.Parent, speaker.Character = Char, nil
+	nHuman.SetStateEnabled(nHuman, 15, false)
+	nHuman.SetStateEnabled(nHuman, 1, false)
+	nHuman.SetStateEnabled(nHuman, 0, false)
+	nHuman.BreakJointsOnDeath, Human = true, Human.Destroy(Human)
+	speaker.Character, Cam.CameraSubject, Cam.CFrame = Char, nHuman, wait() and Pos
+	nHuman.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	local Script = Char.FindFirstChild(Char, "Animate")
+	if Script then
+		Script.Disabled = true
+		wait()
+		Script.Disabled = false
+	end
+	nHuman.Health = nHuman.MaxHealth
+end)
+
 cmd.add({"antikillold", "oldantikill", "oldanti",}, {"antikillold", "Older antikill, removes your right arm but cant be bypassed"}, function(p)
     game.Players.LocalPlayer.Character['Right Arm']:remove()
 end)
@@ -1274,88 +1383,58 @@ cmd.add({"removerightleg",}, {"removerightleg", "removes your right leg"}, funct
     game.Players.LocalPlayer.Character['Right Leg']:remove()
 end)
 
-cmd.add({"antifling",}, {"antifling", "Neutralizes Velocity if flung"}, function(p)
-    local Services = setmetatable({}, {__index = function(Self, Index)
-		local NewService = game.GetService(game, Index)
-		if NewService then
-		Self[Index] = NewService
+cmd.add({"fling2",}, {"fling2", "fling2 lol"}, function(p)
+    local LOOP_NUM = tonumber(args[1]) or 1
+	local OrigPos = speaker.Character.HumanoidRootPart.Position
+	local Tools, TempPos = {}, Vector3.new(math.random(-2e5, 2e5), 2e5, math.random(-2e5, 2e5))
+	for i = 1, LOOP_NUM do
+		local Human = speaker.Character:WaitForChild("Humanoid")
+		wait(.1, Human.Parent:MoveTo(TempPos))
+		Human.RootPart.Anchored = speaker:ClearCharacterAppearance(wait(.1)) or true
+		local t = GetHandleTools(speaker)
+		while #t > 0 do
+			for _, v in ipairs(t) do
+				coroutine.wrap(function()
+					for _ = 1, 25 do
+						v.Parent = speaker.Character
+						v.Handle.Anchored = true
+					end
+					for _ = 1, 5 do
+						v.Parent = workspace
+					end
+					table.insert(Tools, v.Handle)
+				end)()
+			end
+			t = GetHandleTools(speaker)
 		end
-		return NewService
-		end})
-		
-		-- [ LocalPlayer ] --
-		local LocalPlayer = Services.Players.LocalPlayer
-		
-		-- // Functions \\ --
-		local function PlayerAdded(Player)
-		   local Detected = false
-		   local Character;
-		   local PrimaryPart;
-		
-		   local function CharacterAdded(NewCharacter)
-			   Character = NewCharacter
-			   repeat
-				   wait()
-				   PrimaryPart = NewCharacter:FindFirstChild("HumanoidRootPart")
-			   until PrimaryPart
-			   Detected = false
-		   end
-		
-		   CharacterAdded(Player.Character or Player.CharacterAdded:Wait())
-		   Player.CharacterAdded:Connect(CharacterAdded)
-		   Services.RunService.Heartbeat:Connect(function()
-			   if (Character and Character:IsDescendantOf(workspace)) and (PrimaryPart and PrimaryPart:IsDescendantOf(Character)) then
-				   if PrimaryPart.AssemblyAngularVelocity.Magnitude > 50 or PrimaryPart.AssemblyLinearVelocity.Magnitude > 100 then
-					   if Detected == false then
-						   game.StarterGui:SetCore("ChatMakeSystemMessage", {
-							   Text = "" .. tostring(Player);
-							   Color = Color3.fromRGB(255, 200, 0);
-						   })
-					   end
-					   Detected = true
-					   for i,v in ipairs(Character:GetDescendants()) do
-						   if v:IsA("BasePart") then
-							   v.CanCollide = false
-							   v.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-							   v.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-							   v.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
-						   end
-					   end
-					   PrimaryPart.CanCollide = false
-					   PrimaryPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-					   PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-					   PrimaryPart.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
-				   end
-			   end
-		   end)
+		wait(.1)
+		speaker.Character = speaker.Character:Destroy()
+		speaker.CharacterAdded:Wait():WaitForChild("Humanoid").Parent:MoveTo(LOOP_NUM == i and OrigPos or TempPos, wait(.1))
+		if i == LOOP_NUM or i % 5 == 0 then
+			local HRP = speaker.Character.HumanoidRootPart
+			if type(firetouchinterest) == "function" then
+				for _, v in ipairs(Tools) do
+					v.Anchored = not firetouchinterest(v, HRP, 1, firetouchinterest(v, HRP, 0)) and false or false
+				end
+			else
+				for _, v in ipairs(Tools) do
+					coroutine.wrap(function()
+						local x = v.CanCollide
+						v.CanCollide = false
+						v.Anchored = false
+						for _ = 1, 10 do
+							v.CFrame = HRP.CFrame
+							wait()
+						end
+						v.CanCollide = x
+					end)()
+				end
+			end
+			wait(.1)
+			Tools = {}
 		end
-		
-		-- // Event Listeners \\ --
-		for i,v in ipairs(Services.Players:GetPlayers()) do
-		   if v ~= LocalPlayer then
-			   PlayerAdded(v)
-		   end
-		end
-		Services.Players.PlayerAdded:Connect(PlayerAdded)
-		
-		local LastPosition = nil
-		Services.RunService.Heartbeat:Connect(function()
-		   pcall(function()
-			   local PrimaryPart = LocalPlayer.Character.PrimaryPart
-			   if PrimaryPart.AssemblyLinearVelocity.Magnitude > 250 or PrimaryPart.AssemblyAngularVelocity.Magnitude > 250 then
-				   PrimaryPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-				   PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-				   PrimaryPart.CFrame = LastPosition
-		
-				   game.StarterGui:SetCore("ChatMakeSystemMessage", {
-					   Text = "You were flung. Neutralizing velocity.";
-					   Color = Color3.fromRGB(255, 0, 0);
-				   })
-			   elseif PrimaryPart.AssemblyLinearVelocity.Magnitude < 50 or PrimaryPart.AssemblyAngularVelocity.Magnitude > 50 then
-				   LastPosition = PrimaryPart.CFrame
-			   end
-		   end)
-		end)
+		TempPos = TempPos + Vector3.new(10, math.random(-5, 5), 0)
+	end
 end)
 
 cmd.add({"move", "addpos", "translate", "trans"}, {"move <X,Y,Z>", "Moves your character by the given X,Y,Z coordinates"}, function(p)
@@ -1471,17 +1550,6 @@ end)
 
 cmd.add({"clip", "unnoclip"}, {"clip", "Enable your player's collision"}, function()
 	lib.disconnect("noclip")
-end)
-
-cmd.add({"killchat", "breakchat"}, {"killchat", "Slowly breaks the chat"}, function()
-while true do
-    wait(1.7)
-local args = {
-    [1] = " ",
-    [2] = "All"
-}
-game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(unpack(args))
-end
 end)
 
 cmd.add({"Reanimate", "reanim"}, {"reanimate", "Reanimates your player"}, function()
@@ -2094,6 +2162,49 @@ cmd.add({"nodance", "untooldance"}, {"nodance", "Stop making tools dance"}, func
 	lib.disconnect("tooldance")
 end)
 
+cmd.add({"Day"}, {"Day", "Changes the client time to day"}, function()
+	game:GetService("Lighting").ClockTime = 14
+end)
+
+cmd.add({"Night"}, {"Night", "Changes the client time to night"}, function()
+	game:GetService("Lighting").ClockTime = 0
+end)
+
+cmd.add({"nofog"}, {"nofog", "Removes all fog from the client"}, function()
+		game:GetService("Lighting").FogEnd = 100000
+	for i,v in pairs(game:GetService("Lighting"):GetDescendants()) do
+		if v:IsA("Atmosphere") then
+			v:Destroy()
+		end
+	end
+end)
+
+cmd.add({"Fullbright"}, {"Fullbright", "Enables fullright for the client"}, function()
+	game:GetService("Lighting").Brightness = args[1]
+end)
+
+cmd.add({"Globalshadows"}, {"Globalshadows", "Enables global shadows for the client"}, function()
+	game:GetService("Lighting").GlobalShadows = true
+end)
+
+cmd.add({"unglobalshadows", "noglobalshadows"}, {"noglobalshadows", "Disables global shadows for the client"}, function()
+	game:GetService("Lighting").GlobalShadows = false
+end)
+
+cmd.add({"serverhop", "shop"}, {"serverhop", "Joins another server"}, function()
+		local x = {}
+	for _, v in ipairs(game:GetService("HttpService"):JSONDecode(game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data) do
+		if type(v) == "table" and v.maxPlayers > v.playing and v.id ~= game.JobId then
+			x[#x + 1] = v.id
+		end
+	end
+	if #x > 0 then
+		game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, x[math.random(1, #x)])
+	else
+		return notify("Serverhop","Couldn't find a server.")
+	end
+end)
+
 cmd.add({"toolvis", "audiovis"}, {"toolvis <size>", "Turn your tools into an audio visualizer"}, function(size)
 	lib.disconnect("tooldance")
 	local backpack = localPlayer:FindFirstChildWhichIsA("Backpack")
@@ -2303,7 +2414,7 @@ cmd.add({"nodecals", "nodecal", "notextures"}, {"nodecals", "Remove all characte
 	end
 end)
 
-cmd.add({"godmode"}, {"godmode", "Fling anyone that touches you using angular velocity"}, function()
+cmd.add({"Playerfling"}, {"Playerfling", "Fling anyone that touches you using angular velocity"}, function()
 	lib.disconnect("pfling")
 	local char = player.Character
 	local hum = char:FindFirstChildWhichIsA("Humanoid")
@@ -2579,7 +2690,7 @@ cmd.add({"unwatch", "unview"}, {"unwatch", "Stop watching a player"}, function()
 	end
 end)
 
-cmd.add({"copyaudio", "getaudio"}, {"copyaudio <player>", "Copy all sounds a player is playing to your clipboard  -Cyrus"}, function(p)
+cmd.add({"copyaudio", "getaudio"}, {"copyaudio <player>", "Copy all sounds a player is playing to your clipboard"}, function(p)
 	local players = argument.getPlayers(p)
 	local audios = ""
 	for _, player in pairs(players) do
@@ -2596,7 +2707,7 @@ cmd.add({"copyaudio", "getaudio"}, {"copyaudio <player>", "Copy all sounds a pla
 	setclipboard(audios)
 end)
 
-cmd.add({"saveaudio", "stealaudio", "steal"}, {"saveaudio <player>", "Save all sounds a player is playing to a file  -Cyrus"}, function(p)
+cmd.add({"saveaudio", "stealaudio", "steal"}, {"saveaudio <player>", "Save all sounds a player is playing to a file"}, function(p)
 	local players = argument.getPlayers(p)
 	local audios = ""
 	for _, player in pairs(players) do
